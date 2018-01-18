@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>基于百度地图的历史轨迹</title>
+    <style>
+        body,
+        html {
+            padding: 0;
+            margin: 0
+        }
+
+        #container {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #444444;
+        }
+
+        .btn-grounp {
+            position: fixed;
+            right: 100px;
+            top: 10px;
+        }
+
+        .btn-grounp>input[type="button"] {
+            height: 25px;
+            
+            border-radius: 5px;
+            color: #444444;
+            background-color: #F8F8F8;
+            border: 1px solid #BBBBBB;
+        }
+    </style>
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=x1ySji2AxajkmThvd8weGwOQ"></script>
+</head>
+
+<body>
+    <div id="container">
+        <div id="map"></div>
+        <div class="btn-grounp">
+            <input id="follow" type="checkbox">
+                <span style="font-size:12px;">画面跟随</span>
+            </input>
+            <input id="play" type="button" value="播放" onclick="play();" disabled />
+            <input id="pause" type="button" value="暂停" onclick="pause();" disabled />
+            <input id="reset" type="button" value="重置" onclick="reset()" disabled />
+            <input type="button" value="初始化路线" onclick="drawLuShu()">
+        </div>
+    </div>
+</body>
+
+
+<script>
+    var map, points, followChk, playBtn, pauseBtn, resetBtn, car, centerPoint,prePoint;
+
+    
+        map = new BMap.Map("map");
+        map.enableScrollWheelZoom();
+        map.addControl(new BMap.NavigationControl());
+        map.addControl(new BMap.ScaleControl());
+        map.addControl(new BMap.OverviewMapControl({
+            isOpen: true
+        }));
+        followChk = document.getElementById("follow");
+        playBtn = document.getElementById("play");
+        pauseBtn = document.getElementById("pause");
+        resetBtn = document.getElementById("reset");
+        var driving = new BMap.DrivingRoute(map);
+        driving.search(new BMap.Point(112.994341,28.234125), new BMap.Point(112.887119,28.160267));
+        driving.setSearchCompleteCallback(function () {
+            points = driving.getResults().getPlan(0).getRoute(0).getPath();
+            prePoint = points[0]
+            map.centerAndZoom(points[0], 15);
+        })
+    
+    
+
+    function getZoom(maxLng, minLng, maxLat, minLat) { //计算缩放级别
+        var zoom = [
+            "50",
+            "100",
+            "200",
+            "500",
+            "1000",
+            "2000",
+            "5000",
+            "10000",
+            "20000",
+            "25000",
+            "50000",
+            "100000",
+            "200000",
+            "500000",
+            "1000000",
+            "2000000"
+        ]; //级别18到3。
+        var pointA = new BMap.Point(maxLng, maxLat); // 创建点坐标A
+        var pointB = new BMap.Point(minLng, minLat); // 创建点坐标B
+        var distance = this.map.getDistance(pointA, pointB).toFixed(1); //获取两点距离,保留小数点后两位
+        for (var i = 0, zoomLen = zoom.length; i < zoomLen; i++) {
+            if (zoom[i] - distance > 0) {
+                return 18 - i + 3; //之所以会多3，是因为地图范围常常是比例尺距离的10倍以上。所以级别会增加3。
+            }
+        }
+    };
+
+    //还是不要用路书
+    function drawLuShu() { //初始化黑线
+        map.clearOverlays();
+
+
+        centerPoint = new BMap.Point((points[0].lng + points[points.length - 1].lng) / 2, (points[0].lat + points[
+            points.length - 1].lat) / 2);
+        map.panTo(centerPoint);
+        map.addOverlay(new BMap.Polyline(points, {
+            strokeColor: "black",
+            strokeWeight: 5,
+            strokeOpacity: 1
+        }));
+        label = new BMap.Label("", {
+            offset: new BMap.Size(40, 20)
+        });
+        label.setStyle({
+            color: '#444444',
+            backgroundColor: '#f8f8f8',
+            border: '1px solid #bbbbbb',
+            borderRadius: '5px'
+        })
+        var myIcon = new BMap.Icon("car.png", new BMap.Size(40, 20), {
+            anchor: new BMap.Size(20, 10),
+            imageSize: new BMap.Size(40, 20),
+        });
+        car = new BMap.Marker(points[0], {
+            icon: myIcon
+        });
+        car.setLabel(label);
+        map.addOverlay(car);
+
+        //点亮操作按钮
+        playBtn.disabled = false;
+        resetBtn.disabled = false;
+        var minLng = points[0].lng;
+		var maxLng = points[0].lng;
+		var minLat = points[0].lat;
+		var maxLat = points[0].lat;
+        points.forEach(pot=>{
+            if (pot.lng > maxLng) maxLng = pot.lng;
+          	if (pot.lng < minLng) minLng = pot.lng;
+          	if (pot.lat > maxLat) maxLat = pot.lat;
+          	if (pot.lat < minLat) minLat = pot.lat;
+        })
+        map.centerAndZoom(points[0], getZoom(maxLng, minLng, maxLat, minLat))
+
+        reset()
+    }
+    var index = 0;
+    var timer, count, currentCount = 0;
+
+    function play() {
+        playBtn.disabled = true;
+        pauseBtn.disabled = false;
+
+        var point; //在这里确定下一个要跳的点和index增不增
+
+        if (index == points.length - 1) {
+            return
+        }
+        setRotation(points[index - 1] || points[0], points[index], points[index + 1] || points[points.length - 1], car)
+        var projection = map.getMapType().getProjection();
+        var init_pos = projection.lngLatToPoint(points[index]);
+        var target_pos = projection.lngLatToPoint(points[index + 1]);
+        //如果发现有count就执行
+        if (typeof count != 'undefined') {
+            if (count > currentCount && count >= 1) {
+                var x = linear(init_pos.x, target_pos.x, currentCount, count);
+                var y = linear(init_pos.y, target_pos.y, currentCount, count);
+                point = projection.pointToLngLat(new BMap.Pixel(x, y));
+                //console.log(point)
+                currentCount++;
+            } else {
+                if (count <= currentCount) {
+                    point = points[index + 1] || points[points.length - 1];
+                } else {
+                    point = points[index]
+                }
+                //console.log(point)
+                index++;
+                count = undefined;
+                currentCount = 0;
+                if (followChk.checked) {
+                    map.panTo(point);
+                }
+            }
+        } else {
+            //计算points[index]  和pointt[index+1] 之间的count
+            count = Math.round(Math.sqrt(Math.pow(init_pos.x - target_pos.x, 2) + Math.pow(init_pos.y - target_pos.y, 2)) /
+                (1000 / (1000 / 10)));
+            point = points[index]
+        }
+
+        if (index > 0 || currentCount > 0) {
+            map.addOverlay(new BMap.Polyline([prePoint, point], {
+                strokeColor: "red",
+                strokeWeight: 1,
+                strokeOpacity: 1
+            }));
+        }
+        prePoint = point;
+        //console.log(point)
+        label.setContent("经度: " + point.lng + "<br>纬度: " + point.lat);
+        car.setPosition(point);
+
+        //move(points[index],points[index+1]||points[points.length-1])
+        //index++;
+
+        if (index < points.length) {
+            timer = window.setTimeout("play(" + index + ")", 10);
+        } else {
+            playBtn.disabled = true;
+            pauseBtn.disabled = true;
+            map.panTo(point);
+        }
+    }
+
+    function pause() {
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+
+        if (timer) {
+            window.clearTimeout(timer);
+        }
+    }
+
+    function reset() {
+        followChk.checked = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+
+        if (timer) {
+            window.clearTimeout(timer);
+        }
+        index = 0;
+        car.setPosition(points[0]);
+        map.panTo(centerPoint);
+        prePoint = points[0]
+    }
+
+    function setRotation(prePos, curPos, targetPos, me) { //设置car的角度
+        var deg = 0;
+        //start!
+        curPos = map.pointToPixel(curPos);
+        targetPos = map.pointToPixel(targetPos);
+
+        if (targetPos.x != curPos.x) {
+            var tan = (targetPos.y - curPos.y) / (targetPos.x - curPos.x),
+                atan = Math.atan(tan);
+            deg = atan * 360 / (2 * Math.PI);
+            //degree  correction;
+            if (targetPos.x < curPos.x) {
+                deg = -deg + 90 + 90;
+
+            } else {
+                deg = -deg;
+            }
+            //console.log(car)
+            car.setRotation(-deg);
+
+        } else {
+            var disy = targetPos.y - curPos.y;
+            var bias = 0;
+            if (disy > 0)
+                bias = -1
+            else
+                bias = 1
+            car.setRotation(-bias * 90);
+        }
+        return;
+
+    }
+
+    function linear(initPos, targetPos, currentCount, count) {
+        var b = initPos,
+            c = targetPos - initPos,
+            t = currentCount,
+            d = count;
+        return c * t / d + b;
+    }
+    
+
+</script>
+
+</html>
