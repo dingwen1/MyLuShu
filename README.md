@@ -7,3 +7,5 @@
 - 有暂停、重置等回放控制
 - 有地图中心自动跟随控制
 - 等等···
+
+[演示demo地址](https://dingwen1.github.io/MyLuShu/MyLuShu.html)
