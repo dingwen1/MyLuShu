@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>基于百度地图的历史轨迹</title>
+    <style>
+    body,
+    html {
+        padding: 0;
+        margin: 0
+    }
+
+    #container {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+    }
+
+    #map {
+        width: 100%;
+        height: 100%;
+        background: #444444;
+    }
+
+    .btn-grounp {
+        position: fixed;
+        right: 100px;
+        top: 10px;
+    }
+
+    .btn-grounp>input[type="button"] {
+        height: 25px;
+
+        border-radius: 5px;
+        color: #444444;
+        background-color: #F8F8F8;
+        border: 1px solid #BBBBBB;
+    }
+</style>
+<script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=x1ySji2AxajkmThvd8weGwOQ"></script>
+<script type="text/javascript" src="Dls.js"></script>
+</head>
+
+<body>
+    <div id="container">
+        <div id="map"></div>
+        <div class="btn-grounp">
+            <input id="follow" type="checkbox">
+            <span style="font-size:12px;">画面跟随</span>
+        </input>
+        <input id="play" type="button" value="播放" onclick="play();" disabled />
+        <input id="pause" type="button" value="暂停" onclick="pause();" disabled />
+        <input id="reset" type="button" value="重置" onclick="reset()" disabled />
+        <input type="button" value="初始化路线" onclick="drawLuShu()">
+    </div>
+</div>
+</body>
+
+<script type="text/javascript">
+    var map = new BMap.Map("map");
+   map.enableScrollWheelZoom();
+   map.centerAndZoom(new BMap.Point(112.994341,28.234125),14)
+    var driving = new BMap.DrivingRoute(map);
+    driving.search(new BMap.Point(112.994341,28.234125), new BMap.Point(112.887119,28.160267));
+    var lu;
+    driving.setSearchCompleteCallback(function () {
+        points = driving.getResults().getPlan(0).getRoute(0).getPath();
+        lu = new Dls({map:map,points:points})
+    });
+</script>
+</html>
